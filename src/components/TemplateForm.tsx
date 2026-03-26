@@ -1,4 +1,14 @@
-export const TemplateForm = ({ templateData, onChange, onSave, errors = {} }) => (
+import React from 'react';
+import type { TemplateFormData } from '../types';
+
+interface TemplateFormProps {
+  templateData: TemplateFormData;
+  onChange: (patch: Partial<TemplateFormData>) => void;
+  onSave: () => void;
+  errors?: Record<string, string>;
+}
+
+export const TemplateForm: React.FC<TemplateFormProps> = ({ templateData, onChange, onSave, errors = {} }) => (
   <div className="space-y-5 pb-6">
     <div className="space-y-1.5">
       <p className="text-[8px] font-black text-gray-400 ml-1 uppercase">
@@ -26,7 +36,7 @@ export const TemplateForm = ({ templateData, onChange, onSave, errors = {} }) =>
       </p>
       <textarea
         placeholder="定型文を入力..."
-        rows="8"
+        rows={8}
         className="w-full bg-[#fafafa] rounded-2xl p-4 text-[13px] font-medium outline-none border-2 border-transparent focus:border-black transition-all"
         value={templateData.content}
         onChange={(e) => onChange({ content: e.target.value })}

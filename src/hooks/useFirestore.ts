@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 import { subscribeExchanges, subscribeTemplates } from '../services/firestore';
+import type { Exchange, Template } from '../types';
 
-export const useFirestore = (uid) => {
-  const [exchanges, setExchanges] = useState([]);
-  const [templates, setTemplates] = useState([]);
+interface UseFirestoreReturn {
+  exchanges: Exchange[];
+  templates: Template[];
+  loading: boolean;
+}
+
+export const useFirestore = (uid: string | undefined): UseFirestoreReturn => {
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

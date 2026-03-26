@@ -1,4 +1,12 @@
-export const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
+import React from 'react';
+
+interface ConfirmDialogProps {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ message, onConfirm, onCancel }) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
     <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl space-y-4">
       <p className="text-xs font-bold text-center text-gray-600 leading-relaxed whitespace-pre-wrap">

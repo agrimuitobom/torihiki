@@ -1,4 +1,9 @@
-export const MigrationBanner = ({ onMigrate, onDismiss }) => (
+interface Props {
+  onMigrate: () => void;
+  onDismiss: () => void;
+}
+
+export const MigrationBanner = ({ onMigrate, onDismiss }: Props) => (
   <div className="bg-[#fff5f7] border border-[#ffdce5] rounded-2xl p-4 space-y-3">
     <p className="text-[11px] font-bold text-gray-600 leading-relaxed">
       このブラウザにローカルデータが見つかりました。クラウドに移行しますか？

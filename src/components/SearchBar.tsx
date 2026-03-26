@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from './Icon';
 
-export const SearchBar = ({ value, onChange }) => {
+interface Props {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export const SearchBar = ({ value, onChange }: Props) => {
   const [expanded, setExpanded] = useState(false);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (expanded && inputRef.current) {

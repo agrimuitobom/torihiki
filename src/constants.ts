@@ -1,4 +1,6 @@
-export const TABS = [
+import type { Tab, Status, ExchangeFormData, TemplateFormData } from './types';
+
+export const TABS: Tab[] = [
   { id: 'ongoing', label: '進行中' },
   { id: 'dm', label: 'ＤＭ済' },
   { id: 'waiting', label: '待機' },
@@ -6,9 +8,9 @@ export const TABS = [
   { id: 'templates', label: '定型文' },
 ];
 
-export const STATUS_OPTIONS = ['未発送', '発送済み', '受取完了'];
+export const STATUS_OPTIONS = ['未発送', '発送済み', '受取完了'] as const satisfies readonly Status[];
 
-export const EMPTY_EXCHANGE = {
+export const EMPTY_EXCHANGE: ExchangeFormData = {
   accountName: '',
   twitterId: '',
   realName: '',
@@ -20,4 +22,4 @@ export const EMPTY_EXCHANGE = {
   category: 'ongoing',
 };
 
-export const EMPTY_TEMPLATE = { title: '', content: '' };
+export const EMPTY_TEMPLATE: TemplateFormData = { title: '', content: '' };

@@ -1,7 +1,15 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { Icon } from './Icon';
+import type { Exchange } from '../types';
 
-export const ExchangeCard = memo(({ item, onEdit, onDelete, onCopy }) => (
+interface ExchangeCardProps {
+  item: Exchange;
+  onEdit: (item: Exchange) => void;
+  onDelete: (id: string | number) => void;
+  onCopy: (text: string, label: string) => void;
+}
+
+export const ExchangeCard: React.FC<ExchangeCardProps> = memo(({ item, onEdit, onDelete, onCopy }) => (
   <div className="bg-white rounded-[1.5rem] p-5 border border-gray-100 shadow-sm space-y-4">
     <div className="flex justify-between items-start">
       <div className="flex items-center gap-3">

@@ -1,4 +1,11 @@
-const ICONS = {
+import React from 'react';
+
+interface IconDef {
+  d: string;
+  fill: boolean;
+}
+
+const ICONS: Record<string, IconDef> = {
   Plus: { d: 'M12 5v14M5 12h14', fill: false },
   Twitter: {
     d: 'M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z',
@@ -30,7 +37,14 @@ const ICONS = {
   GripVertical: { d: 'M9 4h.01M9 8h.01M9 12h.01M9 16h.01M9 20h.01M15 4h.01M15 8h.01M15 12h.01M15 16h.01M15 20h.01', fill: false },
 };
 
-export const Icon = ({ name, size = 16, className = '', filled = false }) => {
+interface IconProps {
+  name: string;
+  size?: number;
+  className?: string;
+  filled?: boolean;
+}
+
+export const Icon: React.FC<IconProps> = ({ name, size = 16, className = '', filled = false }) => {
   const icon = ICONS[name];
   if (!icon) return null;
   const useFill = icon.fill || filled;

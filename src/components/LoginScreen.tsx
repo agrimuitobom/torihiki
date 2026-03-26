@@ -1,6 +1,9 @@
-import { Icon } from './Icon';
+interface Props {
+  onGoogleLogin: () => void;
+  onSkip: () => void;
+}
 
-export const LoginScreen = ({ onGoogleLogin, onSkip }) => (
+export const LoginScreen = ({ onGoogleLogin, onSkip }: Props) => (
   <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-[#fffcfd]">
     <div className="w-full max-w-xs space-y-8 text-center">
       <div className="space-y-2">

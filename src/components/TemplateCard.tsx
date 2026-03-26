@@ -1,7 +1,15 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { Icon } from './Icon';
+import type { Template } from '../types';
 
-export const TemplateCard = memo(({ item, onEdit, onDelete, onCopy }) => (
+interface TemplateCardProps {
+  item: Template;
+  onEdit: (item: Template) => void;
+  onDelete: (id: string | number) => void;
+  onCopy: (text: string, label: string) => void;
+}
+
+export const TemplateCard: React.FC<TemplateCardProps> = memo(({ item, onEdit, onDelete, onCopy }) => (
   <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
     <div className="flex justify-between items-center">
       <h3 className="font-black text-xs flex items-center gap-1.5 italic">

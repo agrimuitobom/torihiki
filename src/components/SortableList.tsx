@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   DndContext,
   closestCenter,
@@ -5,6 +6,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -14,7 +16,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Icon } from './Icon';
 
-const SortableItem = ({ id, children }) => {
+interface SortableItemProps {
+  id: string | number;
+  children: React.ReactNode;
+}
+
+const SortableItem = ({ id, children }: SortableItemProps) => {
   const {
     attributes,
     listeners,
@@ -24,7 +31,7 @@ const SortableItem = ({ id, children }) => {
     isDragging,
   } = useSortable({ id });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
@@ -45,7 +52,13 @@ const SortableItem = ({ id, children }) => {
   );
 };
 
-export const SortableList = ({ items, onReorder, renderItem }) => {
+interface SortableListProps<T extends { id: string | number }> {
+  items: T[];
+  onReorder: (items: T[]) => void;
+  renderItem: (item: T) => React.ReactNode;
+}
+
+export const SortableList = <T extends { id: string | number }>({ items, onReorder, renderItem }: SortableListProps<T>) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -53,7 +66,7 @@ export const SortableList = ({ items, onReorder, renderItem }) => {
     }),
   );
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -63,7 +76,7 @@ export const SortableList = ({ items, onReorder, renderItem }) => {
 
     const reordered = [...items];
     const [moved] = reordered.splice(oldIndex, 1);
-    reordered.splice(newIndex, 0, moved);
+    reordered.splice(newIndex, 0, moved!);
     onReorder(reordered);
   };
 

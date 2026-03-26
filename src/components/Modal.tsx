@@ -1,6 +1,18 @@
 import { useEffect } from 'react';
 import { ExchangeForm } from './ExchangeForm';
 import { TemplateForm } from './TemplateForm';
+import type { ExchangeFormData, TemplateFormData } from '../types';
+
+interface Props {
+  modalType: string;
+  formData: ExchangeFormData;
+  onFormChange: (patch: Partial<ExchangeFormData>) => void;
+  templateData: TemplateFormData;
+  onTemplateChange: (patch: Partial<TemplateFormData>) => void;
+  onSave: () => void;
+  onClose: () => void;
+  errors: Record<string, string>;
+}
 
 export const Modal = ({
   modalType,
@@ -11,9 +23,9 @@ export const Modal = ({
   onSave,
   onClose,
   errors,
-}) => {
+}: Props) => {
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);

@@ -1,6 +1,13 @@
+import React from 'react';
 import { TABS } from '../constants';
+import type { TabId } from '../types';
 
-export const TabNav = ({ activeTab, onTabChange }) => (
+interface TabNavProps {
+  activeTab: TabId;
+  onTabChange: (id: TabId) => void;
+}
+
+export const TabNav: React.FC<TabNavProps> = ({ activeTab, onTabChange }) => (
   <nav className="flex w-full bg-white border border-[#ffdce5] rounded-xl p-1 shadow-sm sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20">
     {TABS.map((tab) => (
       <button

@@ -1,4 +1,11 @@
-export const SummarySection = ({ stats }) => {
+import React from 'react';
+import type { Stats } from '../types';
+
+interface SummarySectionProps {
+  stats: Stats;
+}
+
+export const SummarySection: React.FC<SummarySectionProps> = ({ stats }) => {
   const items = [
     { label: '進行', val: stats.ongoing, color: '#000' },
     { label: 'ＤＭ済', val: stats.dm, color: '#ff8da1' },

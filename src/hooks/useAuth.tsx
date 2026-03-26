@@ -4,13 +4,21 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
+  User,
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
 const googleProvider = new GoogleAuthProvider();
 
-export const useAuth = () => {
-  const [user, setUser] = useState(null);
+interface UseAuthReturn {
+  user: User | null;
+  loading: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+export const useAuth = (): UseAuthReturn => {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

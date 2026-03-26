@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import type { Exchange, Template, ExchangeFormData, TemplateFormData, TabId, Category } from './types';
 import { EMPTY_EXCHANGE, EMPTY_TEMPLATE } from './constants';
 import { copyToClipboard } from './utils/clipboard';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -43,8 +44,8 @@ const App = () => {
   } = useFirestore(user?.uid);
 
   // localStorage (local) data
-  const [localExchanges, setLocalExchanges] = useLocalStorage('exchanges', []);
-  const [localTemplates, setLocalTemplates] = useLocalStorage('templates', []);
+  const [localExchanges, setLocalExchanges] = useLocalStorage<Exchange[]>('exchanges', []);
+  const [localTemplates, setLocalTemplates] = useLocalStorage<Template[]>('templates', []);
 
   // Migration banner
   const [showMigration, setShowMigration] = useState(false);
@@ -64,13 +65,13 @@ const App = () => {
     }
   }, [user, localExchanges.length, localTemplates.length]);
 
-  const [activeTab, setActiveTab] = useState('ongoing');
+  const [activeTab, setActiveTab] = useState<TabId>('ongoing');
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState('exchange');
-  const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ ...EMPTY_EXCHANGE });
-  const [templateData, setTemplateData] = useState({ ...EMPTY_TEMPLATE });
-  const [errors, setErrors] = useState({});
+  const [modalType, setModalType] = useState<'exchange' | 'template'>('exchange');
+  const [editingItem, setEditingItem] = useState<Exchange | Template | null>(null);
+  const [formData, setFormData] = useState<ExchangeFormData>({ ...EMPTY_EXCHANGE });
+  const [templateData, setTemplateData] = useState<TemplateFormData>({ ...EMPTY_TEMPLATE });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { toast, showToast } = useToast();
   const { confirm, ConfirmUI } = useConfirm();
@@ -133,13 +134,13 @@ const App = () => {
     setModalType(type);
     setFormData({
       ...EMPTY_EXCHANGE,
-      category: activeTab === 'templates' ? 'ongoing' : activeTab,
+      category: activeTab === 'templates' ? 'ongoing' : activeTab as Category,
     });
     setTemplateData({ ...EMPTY_TEMPLATE });
     setShowModal(true);
   }, [activeTab]);
 
-  const openEditExchange = useCallback((item) => {
+  const openEditExchange = useCallback((item: Exchange) => {
     setEditingItem(item);
     setErrors({});
     setFormData({ ...item });
@@ -147,7 +148,7 @@ const App = () => {
     setShowModal(true);
   }, []);
 
-  const openEditTemplate = useCallback((item) => {
+  const openEditTemplate = useCallback((item: Template) => {
     setEditingItem(item);
     setErrors({});
     setTemplateData({ ...item });
@@ -162,7 +163,7 @@ const App = () => {
   }, []);
 
   const validate = useCallback(() => {
-    const errs = {};
+    const errs: Record<string, string> = {};
     if (modalType === 'exchange') {
       if (!formData.accountName.trim())
         errs.accountName = '名前を入力してください';
@@ -179,9 +180,9 @@ const App = () => {
     if (modalType === 'exchange') {
       if (isCloud) {
         if (editingItem) {
-          await updateExchange(user.uid, editingItem.id, formData);
+          await updateExchange(user!.uid, editingItem.id, formData);
         } else {
-          await addExchange(user.uid, formData);
+          await addExchange(user!.uid, formData);
         }
       } else {
         if (editingItem) {
@@ -201,9 +202,9 @@ const App = () => {
     } else {
       if (isCloud) {
         if (editingItem) {
-          await updateTemplate(user.uid, editingItem.id, templateData);
+          await updateTemplate(user!.uid, editingItem.id, templateData);
         } else {
-          await addTemplate(user.uid, templateData);
+          await addTemplate(user!.uid, templateData);
         }
       } else {
         if (editingItem) {
@@ -235,13 +236,13 @@ const App = () => {
   ]);
 
   const deleteExchange = useCallback(
-    async (id) => {
+    async (id: string | number) => {
       const ok = await confirm(
         'この取引データを削除しますか？\nこの操作は元に戻せません。',
       );
       if (!ok) return;
       if (isCloud) {
-        await deleteExchangeDoc(user.uid, id);
+        await deleteExchangeDoc(user!.uid, id);
       } else {
         setLocalExchanges((prev) => prev.filter((e) => e.id !== id));
       }
@@ -251,13 +252,13 @@ const App = () => {
   );
 
   const deleteTemplate = useCallback(
-    async (id) => {
+    async (id: string | number) => {
       const ok = await confirm(
         'この定型文を削除しますか？\nこの操作は元に戻せません。',
       );
       if (!ok) return;
       if (isCloud) {
-        await deleteTemplateDoc(user.uid, id);
+        await deleteTemplateDoc(user!.uid, id);
       } else {
         setLocalTemplates((prev) => prev.filter((t) => t.id !== id));
       }
@@ -267,7 +268,7 @@ const App = () => {
   );
 
   const handleFormChange = useCallback(
-    (patch) => {
+    (patch: Partial<ExchangeFormData>) => {
       setFormData((prev) => ({ ...prev, ...patch }));
       const keys = Object.keys(patch);
       if (keys.some((k) => errors[k])) {
@@ -282,7 +283,7 @@ const App = () => {
   );
 
   const handleTemplateChange = useCallback(
-    (patch) => {
+    (patch: Partial<TemplateFormData>) => {
       setTemplateData((prev) => ({ ...prev, ...patch }));
       const keys = Object.keys(patch);
       if (keys.some((k) => errors[k])) {
@@ -297,7 +298,7 @@ const App = () => {
   );
 
   const handleCopy = useCallback(
-    async (text, label = 'コピーしました') => {
+    async (text: string, label = 'コピーしました') => {
       await copyToClipboard(text);
       showToast(label);
     },
@@ -305,7 +306,7 @@ const App = () => {
   );
 
   const handleMigrate = useCallback(async () => {
-    const count = await migrateFromLocalStorage(user.uid);
+    const count = await migrateFromLocalStorage(user!.uid);
     setShowMigration(false);
     setLocalExchanges([]);
     setLocalTemplates([]);
@@ -329,9 +330,9 @@ const App = () => {
 
   // Drag & drop reorder
   const handleReorderExchanges = useCallback(
-    (reordered) => {
+    (reordered: Exchange[]) => {
       if (isCloud) {
-        reorderExchanges(user.uid, reordered);
+        reorderExchanges(user!.uid, reordered);
       } else {
         // Rebuild full list with reordered items in the current tab
         setLocalExchanges((prev) => {
@@ -344,9 +345,9 @@ const App = () => {
   );
 
   const handleReorderTemplates = useCallback(
-    (reordered) => {
+    (reordered: Template[]) => {
       if (isCloud) {
-        reorderTemplates(user.uid, reordered);
+        reorderTemplates(user!.uid, reordered);
       } else {
         setLocalTemplates(reordered);
       }
@@ -372,7 +373,7 @@ const App = () => {
 
   const isSearching = searchQuery.trim().length > 0;
 
-  const renderExchangeCard = (item) => (
+  const renderExchangeCard = (item: Exchange) => (
     <ExchangeCard
       item={item}
       onEdit={openEditExchange}
@@ -381,7 +382,7 @@ const App = () => {
     />
   );
 
-  const renderTemplateCard = (item) => (
+  const renderTemplateCard = (item: Template) => (
     <TemplateCard
       item={item}
       onEdit={openEditTemplate}
