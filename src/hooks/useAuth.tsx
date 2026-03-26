@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
@@ -23,6 +24,9 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Process pending redirect result (for mobile redirect flow)
+    getRedirectResult(auth).catch(() => {});
+
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -32,12 +36,9 @@ export const useAuth = (): UseAuthReturn => {
   const signInWithGoogle = useCallback(async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (e: unknown) {
-      const code = (e as { code?: string }).code;
-      // Popup blocked or unavailable → fall back to redirect
-      if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
-        await signInWithRedirect(auth, googleProvider);
-      }
+    } catch {
+      // Popup failed (blocked, COOP, mobile) → redirect fallback
+      await signInWithRedirect(auth, googleProvider);
     }
   }, []);
 
