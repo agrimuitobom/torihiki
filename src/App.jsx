@@ -4,6 +4,17 @@ import { copyToClipboard } from './utils/clipboard';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useToast } from './hooks/useToast';
 import { useConfirm } from './hooks/useConfirm';
+import { useAuth } from './hooks/useAuth';
+import { useFirestore } from './hooks/useFirestore';
+import {
+  addExchange,
+  updateExchange,
+  deleteExchangeDoc,
+  addTemplate,
+  updateTemplate,
+  deleteTemplateDoc,
+  migrateFromLocalStorage,
+} from './services/firestore';
 import { Icon } from './components/Icon';
 import { Toast } from './components/Toast';
 import { SummarySection } from './components/SummarySection';
@@ -11,11 +22,42 @@ import { TabNav } from './components/TabNav';
 import { ExchangeCard } from './components/ExchangeCard';
 import { TemplateCard } from './components/TemplateCard';
 import { Modal } from './components/Modal';
+import { LoginScreen } from './components/LoginScreen';
+import { MigrationBanner } from './components/MigrationBanner';
 
 const App = () => {
+  const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  const [skippedLogin, setSkippedLogin] = useState(
+    () => localStorage.getItem('skippedLogin') === 'true',
+  );
+
+  // Firestore (cloud) data
+  const {
+    exchanges: cloudExchanges,
+    templates: cloudTemplates,
+    loading: firestoreLoading,
+  } = useFirestore(user?.uid);
+
+  // localStorage (local) data
+  const [localExchanges, setLocalExchanges] = useLocalStorage('exchanges', []);
+  const [localTemplates, setLocalTemplates] = useLocalStorage('templates', []);
+
+  // Migration banner
+  const [showMigration, setShowMigration] = useState(false);
+
+  const isCloud = !!user;
+  const exchanges = isCloud ? cloudExchanges : localExchanges;
+  const templates = isCloud ? cloudTemplates : localTemplates;
+  const dataLoading = isCloud && firestoreLoading;
+
+  // Show migration banner when user logs in and has local data
+  useEffect(() => {
+    if (user && (localExchanges.length > 0 || localTemplates.length > 0)) {
+      setShowMigration(true);
+    }
+  }, [user, localExchanges.length, localTemplates.length]);
+
   const [activeTab, setActiveTab] = useState('ongoing');
-  const [exchanges, setExchanges] = useLocalStorage('exchanges', []);
-  const [templates, setTemplates] = useLocalStorage('templates', []);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('exchange');
   const [editingItem, setEditingItem] = useState(null);
@@ -91,31 +133,50 @@ const App = () => {
     return Object.keys(errs).length === 0;
   }, [modalType, formData, templateData]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!validate()) return;
     if (modalType === 'exchange') {
-      if (editingItem) {
-        setExchanges((prev) =>
-          prev.map((e) =>
-            e.id === editingItem.id ? { ...formData, id: e.id } : e,
-          ),
-        );
+      if (isCloud) {
+        if (editingItem) {
+          await updateExchange(user.uid, editingItem.id, formData);
+        } else {
+          await addExchange(user.uid, formData);
+        }
       } else {
-        setExchanges((prev) => [...prev, { ...formData, id: Date.now() }]);
+        if (editingItem) {
+          setLocalExchanges((prev) =>
+            prev.map((e) =>
+              e.id === editingItem.id ? { ...formData, id: e.id } : e,
+            ),
+          );
+        } else {
+          setLocalExchanges((prev) => [
+            ...prev,
+            { ...formData, id: Date.now() },
+          ]);
+        }
       }
       showToast('取引データを保存しました');
     } else {
-      if (editingItem) {
-        setTemplates((prev) =>
-          prev.map((t) =>
-            t.id === editingItem.id ? { ...templateData, id: t.id } : t,
-          ),
-        );
+      if (isCloud) {
+        if (editingItem) {
+          await updateTemplate(user.uid, editingItem.id, templateData);
+        } else {
+          await addTemplate(user.uid, templateData);
+        }
       } else {
-        setTemplates((prev) => [
-          ...prev,
-          { ...templateData, id: Date.now() },
-        ]);
+        if (editingItem) {
+          setLocalTemplates((prev) =>
+            prev.map((t) =>
+              t.id === editingItem.id ? { ...templateData, id: t.id } : t,
+            ),
+          );
+        } else {
+          setLocalTemplates((prev) => [
+            ...prev,
+            { ...templateData, id: Date.now() },
+          ]);
+        }
       }
       showToast('定型文を保存しました');
     }
@@ -128,6 +189,8 @@ const App = () => {
     validate,
     closeModal,
     showToast,
+    isCloud,
+    user,
   ]);
 
   const deleteExchange = useCallback(
@@ -136,10 +199,14 @@ const App = () => {
         'この取引データを削除しますか？\nこの操作は元に戻せません。',
       );
       if (!ok) return;
-      setExchanges((prev) => prev.filter((e) => e.id !== id));
+      if (isCloud) {
+        await deleteExchangeDoc(user.uid, id);
+      } else {
+        setLocalExchanges((prev) => prev.filter((e) => e.id !== id));
+      }
       showToast('削除しました');
     },
-    [confirm, showToast],
+    [confirm, showToast, isCloud, user],
   );
 
   const deleteTemplate = useCallback(
@@ -148,10 +215,14 @@ const App = () => {
         'この定型文を削除しますか？\nこの操作は元に戻せません。',
       );
       if (!ok) return;
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      if (isCloud) {
+        await deleteTemplateDoc(user.uid, id);
+      } else {
+        setLocalTemplates((prev) => prev.filter((t) => t.id !== id));
+      }
       showToast('削除しました');
     },
-    [confirm, showToast],
+    [confirm, showToast, isCloud, user],
   );
 
   const handleFormChange = useCallback(
@@ -192,7 +263,46 @@ const App = () => {
     [showToast],
   );
 
+  const handleMigrate = useCallback(async () => {
+    const count = await migrateFromLocalStorage(user.uid);
+    setShowMigration(false);
+    setLocalExchanges([]);
+    setLocalTemplates([]);
+    showToast(`${count}件のデータをクラウドに移行しました`);
+  }, [user, showToast]);
+
+  const handleSkipLogin = useCallback(() => {
+    localStorage.setItem('skippedLogin', 'true');
+    setSkippedLogin(true);
+  }, []);
+
+  const handleLogin = useCallback(async () => {
+    localStorage.removeItem('skippedLogin');
+    setSkippedLogin(false);
+    await signInWithGoogle();
+  }, [signInWithGoogle]);
+
+  const handleLogout = useCallback(async () => {
+    await signOut();
+  }, [signOut]);
+
   const visibleExchanges = exchanges.filter((e) => e.category === activeTab);
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Login screen
+  if (!user && !skippedLogin) {
+    return (
+      <LoginScreen onGoogleLogin={signInWithGoogle} onSkip={handleSkipLogin} />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col pb-20 overflow-x-hidden">
@@ -204,52 +314,82 @@ const App = () => {
               取引管理
             </h1>
           </div>
-          <button
-            onClick={openAddModal}
-            className="bg-black text-white w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-lg shadow-black/10"
-          >
-            <Icon name="Plus" size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="text-[9px] font-bold text-gray-400 px-3 py-1.5 rounded-full border border-gray-200 active:bg-gray-100 transition-colors"
+              >
+                ログアウト
+              </button>
+            ) : (
+              <button
+                onClick={handleLogin}
+                className="text-[9px] font-bold text-[#ff8da1] px-3 py-1.5 rounded-full border border-[#ffdce5] active:bg-[#fff5f7] transition-colors"
+              >
+                ログイン
+              </button>
+            )}
+            <button
+              onClick={openAddModal}
+              className="bg-black text-white w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-lg shadow-black/10"
+            >
+              <Icon name="Plus" size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-md mx-auto w-full p-4 space-y-4">
+        {showMigration && (
+          <MigrationBanner
+            onMigrate={handleMigrate}
+            onDismiss={() => setShowMigration(false)}
+          />
+        )}
+
         <SummarySection stats={stats} />
         <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <div className="space-y-4">
-          {activeTab === 'templates' ? (
-            templates.length === 0 ? (
+        {dataLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {activeTab === 'templates' ? (
+              templates.length === 0 ? (
+                <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">
+                  データがありません
+                </p>
+              ) : (
+                templates.map((item) => (
+                  <TemplateCard
+                    key={item.id}
+                    item={item}
+                    onEdit={openEditTemplate}
+                    onDelete={deleteTemplate}
+                    onCopy={handleCopy}
+                  />
+                ))
+              )
+            ) : visibleExchanges.length === 0 ? (
               <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">
                 データがありません
               </p>
             ) : (
-              templates.map((item) => (
-                <TemplateCard
+              visibleExchanges.map((item) => (
+                <ExchangeCard
                   key={item.id}
                   item={item}
-                  onEdit={openEditTemplate}
-                  onDelete={deleteTemplate}
+                  onEdit={openEditExchange}
+                  onDelete={deleteExchange}
                   onCopy={handleCopy}
                 />
               ))
-            )
-          ) : visibleExchanges.length === 0 ? (
-            <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">
-              データがありません
-            </p>
-          ) : (
-            visibleExchanges.map((item) => (
-              <ExchangeCard
-                key={item.id}
-                item={item}
-                onEdit={openEditExchange}
-                onDelete={deleteExchange}
-                onCopy={handleCopy}
-              />
-            ))
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </main>
 
       {showModal && (
