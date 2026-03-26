@@ -1,4 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="38.400000000000006" fill="#000"/>
-  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="sans-serif" font-weight="900" font-size="76.80000000000001">取</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#000"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffb8c6"/>
+      <stop offset="100%" stop-color="#ff8da1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="192" height="192" rx="42" fill="url(#bg)"/>
+  <!-- Decorative corner accent -->
+  <circle cx="160" cy="32" r="28" fill="#ff8da1" opacity="0.12"/>
+  <circle cx="32" cy="160" r="20" fill="#ffb8c6" opacity="0.08"/>
+  <!-- Exchange arrows -->
+  <g transform="translate(96,56)">
+    <!-- Right arrow -->
+    <line x1="-28" y1="0" x2="28" y2="0" stroke="url(#pink)" stroke-width="5" stroke-linecap="round"/>
+    <polyline points="18,-10 28,0 18,10" fill="none" stroke="#ff8da1" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Left arrow -->
+    <line x1="28" y1="18" x2="-28" y2="18" stroke="url(#pink)" stroke-width="5" stroke-linecap="round"/>
+    <polyline points="-18,8 -28,18 -18,28" fill="none" stroke="#ffb8c6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Main text -->
+  <text x="96" y="118" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-weight="900" font-size="52" letter-spacing="-2">取引</text>
+  <!-- Subtle bottom line accent -->
+  <rect x="60" y="140" width="72" height="3" rx="1.5" fill="url(#pink)" opacity="0.6"/>
+  <!-- Small dot accents -->
+  <circle cx="50" cy="141.5" r="2.5" fill="#ffb8c6" opacity="0.5"/>
+  <circle cx="142" cy="141.5" r="2.5" fill="#ff8da1" opacity="0.5"/>
 </svg>
