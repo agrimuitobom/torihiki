@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   onAuthStateChanged,
+  signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
@@ -23,9 +23,6 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Handle redirect result when returning from Google login
-    getRedirectResult(auth).catch(() => {});
-
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -33,7 +30,15 @@ export const useAuth = (): UseAuthReturn => {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    await signInWithRedirect(auth, googleProvider);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e: unknown) {
+      const code = (e as { code?: string }).code;
+      // Popup blocked or unavailable → fall back to redirect
+      if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+        await signInWithRedirect(auth, googleProvider);
+      }
+    }
   }, []);
 
   const signOut = useCallback(async () => {
