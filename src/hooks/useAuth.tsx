@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   onAuthStateChanged,
   signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
@@ -22,6 +23,9 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Handle redirect result when returning from Google login
+    getRedirectResult(auth).catch(() => {});
+
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
