@@ -1,10 +1,6 @@
-const CACHE_NAME = 'torihiki-v2';
-const PRECACHE_URLS = ['/', '/index.html'];
+const CACHE_NAME = 'torihiki-v3';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)),
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
@@ -20,17 +16,27 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+
+  // Only handle same-origin GET requests
+  if (request.method !== 'GET') return;
+  if (!request.url.startsWith(self.location.origin)) return;
+
+  // Skip API calls and auth-related requests
+  if (request.url.includes('/api/') || request.url.includes('firestore')) return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
-        if (response.ok) {
+        // Only cache successful, basic responses
+        if (response.ok && response.type === 'basic') {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, clone).catch(() => {});
+          });
         }
         return response;
       })
-      .catch(() => caches.match(event.request)),
+      .catch(() => caches.match(request)),
   );
 });
