@@ -35,6 +35,10 @@ const ICONS: Record<string, IconDef> = {
   Search: { d: 'M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', fill: false },
   Close: { d: 'M18 6 6 18M6 6l12 12', fill: false },
   GripVertical: { d: 'M9 4h.01M9 8h.01M9 12h.01M9 16h.01M9 20h.01M15 4h.01M15 8h.01M15 12h.01M15 16h.01M15 20h.01', fill: false },
+  Check: { d: 'M20 6 9 17l-5-5', fill: false },
+  CheckSquare: { d: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11', fill: false },
+  Square: { d: 'M3 3h18v18H3z', fill: false },
+  ChevronDown: { d: 'm6 9 6 6 6-6', fill: false },
 };
 
 interface IconProps {

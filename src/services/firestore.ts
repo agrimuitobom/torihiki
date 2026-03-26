@@ -93,6 +93,30 @@ export const updateTemplate = (uid: string, docId: string | number, data: Partia
 export const deleteTemplateDoc = (uid: string, docId: string | number) =>
   deleteDoc(doc(db, 'users', uid, 'templates', String(docId)));
 
+export const bulkUpdateExchanges = async (
+  uid: string,
+  ids: (string | number)[],
+  patch: Partial<Exchange>,
+) => {
+  const { id: _id, createdAt: _ca, ...rest } = patch;
+  const batch = writeBatch(db);
+  ids.forEach((docId) => {
+    batch.update(doc(db, 'users', uid, 'exchanges', String(docId)), {
+      ...rest,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  return batch.commit();
+};
+
+export const bulkDeleteExchanges = async (uid: string, ids: (string | number)[]) => {
+  const batch = writeBatch(db);
+  ids.forEach((docId) => {
+    batch.delete(doc(db, 'users', uid, 'exchanges', String(docId)));
+  });
+  return batch.commit();
+};
+
 export const migrateFromLocalStorage = async (uid: string): Promise<number> => {
   const rawExchanges = localStorage.getItem('exchanges');
   const rawTemplates = localStorage.getItem('templates');

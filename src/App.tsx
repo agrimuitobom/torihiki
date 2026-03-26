@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import type { Exchange, Template, ExchangeFormData, TemplateFormData, TabId, Category } from './types';
+import type { Exchange, Template, ExchangeFormData, TemplateFormData, TabId, Category, Status } from './types';
 import { EMPTY_EXCHANGE, EMPTY_TEMPLATE } from './constants';
 import { copyToClipboard } from './utils/clipboard';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -17,6 +17,8 @@ import {
   migrateFromLocalStorage,
   reorderExchanges,
   reorderTemplates,
+  bulkUpdateExchanges,
+  bulkDeleteExchanges,
 } from './services/firestore';
 import { Icon } from './components/Icon';
 import { Toast } from './components/Toast';
@@ -29,6 +31,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { MigrationBanner } from './components/MigrationBanner';
 import { SearchBar } from './components/SearchBar';
 import { SortableList } from './components/SortableList';
+import { BulkActionBar } from './components/BulkActionBar';
 
 const App = () => {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
@@ -52,6 +55,10 @@ const App = () => {
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
 
   const isCloud = !!user;
   const exchanges = isCloud ? cloudExchanges : localExchanges;
@@ -83,9 +90,11 @@ const App = () => {
     };
   }, [showModal]);
 
-  // Clear search when switching tabs
+  // Clear search and selection when switching tabs
   useEffect(() => {
     setSearchQuery('');
+    setSelectedIds(new Set());
+    setSelectionMode(false);
   }, [activeTab]);
 
   const stats = useMemo(
@@ -355,6 +364,98 @@ const App = () => {
     [isCloud, user],
   );
 
+  // Selection helpers
+  const toggleSelect = useCallback((id: string | number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (next.size === 0) setSelectionMode(false);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const enterSelectionMode = useCallback((id: string | number) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set([id]));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedIds(new Set(visibleExchanges.map((e) => e.id)));
+  }, [visibleExchanges]);
+
+  // Bulk action handlers
+  const handleBulkMyStatus = useCallback(
+    async (status: Status) => {
+      const ids = Array.from(selectedIds);
+      if (isCloud) {
+        await bulkUpdateExchanges(user!.uid, ids, { myStatus: status });
+      } else {
+        setLocalExchanges((prev) =>
+          prev.map((e) => (selectedIds.has(e.id) ? { ...e, myStatus: status } : e)),
+        );
+      }
+      showToast(`${ids.length}件のMyStatusを${status}に変更しました`);
+      clearSelection();
+    },
+    [selectedIds, isCloud, user, showToast, clearSelection],
+  );
+
+  const handleBulkPartnerStatus = useCallback(
+    async (status: Status) => {
+      const ids = Array.from(selectedIds);
+      if (isCloud) {
+        await bulkUpdateExchanges(user!.uid, ids, { partnerStatus: status });
+      } else {
+        setLocalExchanges((prev) =>
+          prev.map((e) => (selectedIds.has(e.id) ? { ...e, partnerStatus: status } : e)),
+        );
+      }
+      showToast(`${ids.length}件のPartnerStatusを${status}に変更しました`);
+      clearSelection();
+    },
+    [selectedIds, isCloud, user, showToast, clearSelection],
+  );
+
+  const handleBulkCategory = useCallback(
+    async (category: Category) => {
+      const ids = Array.from(selectedIds);
+      if (isCloud) {
+        await bulkUpdateExchanges(user!.uid, ids, { category });
+      } else {
+        setLocalExchanges((prev) =>
+          prev.map((e) => (selectedIds.has(e.id) ? { ...e, category } : e)),
+        );
+      }
+      showToast(`${ids.length}件をカテゴリ移動しました`);
+      clearSelection();
+    },
+    [selectedIds, isCloud, user, showToast, clearSelection],
+  );
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    const ok = await confirm(
+      `${ids.length}件の取引データを削除しますか？\nこの操作は元に戻せません。`,
+    );
+    if (!ok) return;
+    if (isCloud) {
+      await bulkDeleteExchanges(user!.uid, ids);
+    } else {
+      setLocalExchanges((prev) => prev.filter((e) => !selectedIds.has(e.id)));
+    }
+    showToast(`${ids.length}件を削除しました`);
+    clearSelection();
+  }, [selectedIds, isCloud, user, confirm, showToast, clearSelection]);
+
   // Loading state
   if (authLoading) {
     return (
@@ -379,6 +480,10 @@ const App = () => {
       onEdit={openEditExchange}
       onDelete={deleteExchange}
       onCopy={handleCopy}
+      selectionMode={selectionMode}
+      selected={selectedIds.has(item.id)}
+      onToggleSelect={toggleSelect}
+      onEnterSelectionMode={enterSelectionMode}
     />
   );
 
@@ -392,7 +497,7 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 overflow-x-hidden">
+    <div className={`min-h-screen flex flex-col overflow-x-hidden ${selectedIds.size > 0 ? 'pb-52' : 'pb-20'}`}>
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-100 safe-top sticky top-0 z-30">
         <div className="max-w-md mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 shrink-0">
@@ -438,6 +543,20 @@ const App = () => {
 
         <SummarySection stats={stats} />
         <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {selectionMode && activeTab !== 'templates' && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-gray-400 italic">
+              {selectedIds.size}/{visibleExchanges.length}件選択中
+            </span>
+            <button
+              onClick={selectAllVisible}
+              className="text-[10px] font-bold text-[#ff8da1] px-3 py-1 rounded-full border border-[#ffdce5] active:bg-[#fff5f7] transition-colors"
+            >
+              すべて選択
+            </button>
+          </div>
+        )}
 
         {dataLoading ? (
           <div className="flex justify-center py-10">
@@ -490,6 +609,17 @@ const App = () => {
           onSave={handleSave}
           onClose={closeModal}
           errors={errors}
+        />
+      )}
+
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          selectedCount={selectedIds.size}
+          onChangeMyStatus={handleBulkMyStatus}
+          onChangePartnerStatus={handleBulkPartnerStatus}
+          onChangeCategory={handleBulkCategory}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={clearSelection}
         />
       )}
 

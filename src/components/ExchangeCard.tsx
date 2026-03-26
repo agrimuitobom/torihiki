@@ -7,12 +7,65 @@ interface ExchangeCardProps {
   onEdit: (item: Exchange) => void;
   onDelete: (id: string | number) => void;
   onCopy: (text: string, label: string) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string | number) => void;
+  onEnterSelectionMode?: (id: string | number) => void;
 }
 
-export const ExchangeCard: React.FC<ExchangeCardProps> = memo(({ item, onEdit, onDelete, onCopy }) => (
-  <div className="bg-white rounded-[1.5rem] p-5 border border-gray-100 shadow-sm space-y-4">
+export const ExchangeCard: React.FC<ExchangeCardProps> = memo(({ item, onEdit, onDelete, onCopy, selectionMode, selected, onToggleSelect, onEnterSelectionMode }) => {
+  const longPressRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = React.useRef(false);
+
+  const handlePointerDown = () => {
+    if (selectionMode) return;
+    cancelledRef.current = false;
+    longPressRef.current = setTimeout(() => {
+      if (!cancelledRef.current) {
+        onEnterSelectionMode?.(item.id);
+      }
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    cancelledRef.current = true;
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+
+  const handleCardClick = () => {
+    if (selectionMode && onToggleSelect) {
+      onToggleSelect(item.id);
+    }
+  };
+
+  return (
+  <div
+    className={`bg-white rounded-[1.5rem] p-5 border-2 shadow-sm space-y-4 transition-colors ${
+      selected ? 'border-[#ff8da1] bg-[#fff9fa]' : 'border-gray-100'
+    }`}
+    onClick={handleCardClick}
+    onPointerDown={handlePointerDown}
+    onPointerUp={handlePointerUp}
+    onPointerCancel={handlePointerUp}
+    onPointerLeave={handlePointerUp}
+  >
     <div className="flex justify-between items-start">
       <div className="flex items-center gap-3">
+        {selectionMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(item.id); }}
+            className="shrink-0"
+          >
+            <Icon
+              name={selected ? 'CheckSquare' : 'Square'}
+              size={20}
+              className={selected ? 'text-[#ff8da1]' : 'text-gray-300'}
+            />
+          </button>
+        )}
         <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center border border-[#ffdce5] shadow-inner">
           <Icon name="Twitter" size={18} />
         </div>
@@ -20,12 +73,22 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = memo(({ item, onEdit, o
           <h3 className="font-black text-sm text-black leading-tight tracking-tight">
             {item.accountName}
           </h3>
-          <button
-            onClick={() => onCopy(item.twitterId, 'IDをコピーしました')}
-            className="text-[10px] font-bold text-[#ff8da1] flex items-center gap-1 mt-0.5"
-          >
-            @{item.twitterId} <Icon name="Clipboard" size={10} />
-          </button>
+          <div className="flex items-center gap-1 mt-0.5">
+            <a
+              href={`https://x.com/${item.twitterId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-bold text-[#ff8da1] hover:underline"
+            >
+              @{item.twitterId}
+            </a>
+            <button
+              onClick={() => onCopy(item.twitterId, 'IDをコピーしました')}
+              className="text-[#ff8da1]"
+            >
+              <Icon name="Clipboard" size={10} />
+            </button>
+          </div>
         </div>
       </div>
       <div className="bg-[#fff9fa] px-3 py-1 rounded-full border border-[#ffdce5]">
@@ -105,4 +168,5 @@ export const ExchangeCard: React.FC<ExchangeCardProps> = memo(({ item, onEdit, o
       </button>
     </div>
   </div>
-));
+  );
+});
