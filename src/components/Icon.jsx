@@ -25,6 +25,9 @@ const ICONS = {
     fill: true,
   },
   ChevronRight: { d: 'm9 18 6-6-6-6', fill: false },
+  Search: { d: 'M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', fill: false },
+  Close: { d: 'M18 6 6 18M6 6l12 12', fill: false },
+  GripVertical: { d: 'M9 4h.01M9 8h.01M9 12h.01M9 16h.01M9 20h.01M15 4h.01M15 8h.01M15 12h.01M15 16h.01M15 20h.01', fill: false },
 };
 
 export const Icon = ({ name, size = 16, className = '', filled = false }) => {
