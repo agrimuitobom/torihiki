@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -15,7 +16,7 @@ const userCollection = (uid, name) =>
   collection(db, 'users', uid, name);
 
 export const subscribeExchanges = (uid, callback) => {
-  const q = query(userCollection(uid, 'exchanges'), orderBy('createdAt', 'desc'));
+  const q = query(userCollection(uid, 'exchanges'), orderBy('sortOrder', 'asc'));
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     callback(items);
@@ -23,7 +24,7 @@ export const subscribeExchanges = (uid, callback) => {
 };
 
 export const subscribeTemplates = (uid, callback) => {
-  const q = query(userCollection(uid, 'templates'), orderBy('createdAt', 'desc'));
+  const q = query(userCollection(uid, 'templates'), orderBy('sortOrder', 'asc'));
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     callback(items);
@@ -34,6 +35,7 @@ export const addExchange = (uid, data) => {
   const { id: _id, ...rest } = data;
   return addDoc(userCollection(uid, 'exchanges'), {
     ...rest,
+    sortOrder: Date.now(),
     createdAt: serverTimestamp(),
   });
 };
@@ -53,8 +55,29 @@ export const addTemplate = (uid, data) => {
   const { id: _id, ...rest } = data;
   return addDoc(userCollection(uid, 'templates'), {
     ...rest,
+    sortOrder: Date.now(),
     createdAt: serverTimestamp(),
   });
+};
+
+export const reorderExchanges = async (uid, orderedItems) => {
+  const batch = writeBatch(db);
+  orderedItems.forEach((item, index) => {
+    batch.update(doc(db, 'users', uid, 'exchanges', item.id), {
+      sortOrder: index,
+    });
+  });
+  return batch.commit();
+};
+
+export const reorderTemplates = async (uid, orderedItems) => {
+  const batch = writeBatch(db);
+  orderedItems.forEach((item, index) => {
+    batch.update(doc(db, 'users', uid, 'templates', item.id), {
+      sortOrder: index,
+    });
+  });
+  return batch.commit();
 };
 
 export const updateTemplate = (uid, docId, data) => {

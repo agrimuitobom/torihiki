@@ -14,6 +14,8 @@ import {
   updateTemplate,
   deleteTemplateDoc,
   migrateFromLocalStorage,
+  reorderExchanges,
+  reorderTemplates,
 } from './services/firestore';
 import { Icon } from './components/Icon';
 import { Toast } from './components/Toast';
@@ -24,6 +26,8 @@ import { TemplateCard } from './components/TemplateCard';
 import { Modal } from './components/Modal';
 import { LoginScreen } from './components/LoginScreen';
 import { MigrationBanner } from './components/MigrationBanner';
+import { SearchBar } from './components/SearchBar';
+import { SortableList } from './components/SortableList';
 
 const App = () => {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
@@ -44,6 +48,9 @@ const App = () => {
 
   // Migration banner
   const [showMigration, setShowMigration] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isCloud = !!user;
   const exchanges = isCloud ? cloudExchanges : localExchanges;
@@ -75,6 +82,11 @@ const App = () => {
     };
   }, [showModal]);
 
+  // Clear search when switching tabs
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activeTab]);
+
   const stats = useMemo(
     () => ({
       ongoing: exchanges.filter((e) => e.category === 'ongoing').length,
@@ -84,6 +96,35 @@ const App = () => {
     }),
     [exchanges],
   );
+
+  // Filter exchanges by tab + search
+  const visibleExchanges = useMemo(() => {
+    let filtered = exchanges.filter((e) => e.category === activeTab);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (e) =>
+          e.accountName?.toLowerCase().includes(q) ||
+          e.twitterId?.toLowerCase().includes(q) ||
+          e.realName?.toLowerCase().includes(q) ||
+          e.receivingItem?.toLowerCase().includes(q) ||
+          e.givingItem?.toLowerCase().includes(q) ||
+          e.notes?.toLowerCase().includes(q),
+      );
+    }
+    return filtered;
+  }, [exchanges, activeTab, searchQuery]);
+
+  // Filter templates by search
+  const visibleTemplates = useMemo(() => {
+    if (!searchQuery.trim()) return templates;
+    const q = searchQuery.toLowerCase();
+    return templates.filter(
+      (t) =>
+        t.title?.toLowerCase().includes(q) ||
+        t.content?.toLowerCase().includes(q),
+    );
+  }, [templates, searchQuery]);
 
   const openAddModal = useCallback(() => {
     setEditingItem(null);
@@ -286,7 +327,32 @@ const App = () => {
     await signOut();
   }, [signOut]);
 
-  const visibleExchanges = exchanges.filter((e) => e.category === activeTab);
+  // Drag & drop reorder
+  const handleReorderExchanges = useCallback(
+    (reordered) => {
+      if (isCloud) {
+        reorderExchanges(user.uid, reordered);
+      } else {
+        // Rebuild full list with reordered items in the current tab
+        setLocalExchanges((prev) => {
+          const otherTabs = prev.filter((e) => e.category !== activeTab);
+          return [...otherTabs, ...reordered];
+        });
+      }
+    },
+    [isCloud, user, activeTab],
+  );
+
+  const handleReorderTemplates = useCallback(
+    (reordered) => {
+      if (isCloud) {
+        reorderTemplates(user.uid, reordered);
+      } else {
+        setLocalTemplates(reordered);
+      }
+    },
+    [isCloud, user],
+  );
 
   // Loading state
   if (authLoading) {
@@ -304,35 +370,56 @@ const App = () => {
     );
   }
 
+  const isSearching = searchQuery.trim().length > 0;
+
+  const renderExchangeCard = (item) => (
+    <ExchangeCard
+      item={item}
+      onEdit={openEditExchange}
+      onDelete={deleteExchange}
+      onCopy={handleCopy}
+    />
+  );
+
+  const renderTemplateCard = (item) => (
+    <TemplateCard
+      item={item}
+      onEdit={openEditTemplate}
+      onDelete={deleteTemplate}
+      onCopy={handleCopy}
+    />
+  );
+
   return (
     <div className="min-h-screen flex flex-col pb-20 overflow-x-hidden">
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-100 safe-top sticky top-0 z-30">
         <div className="max-w-md mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="w-1.5 h-4 bg-black rounded-full" />
             <h1 className="text-sm font-black italic tracking-tighter">
               取引管理
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <SearchBar value={searchQuery} onChange={setSearchQuery} />
             {user ? (
               <button
                 onClick={handleLogout}
-                className="text-[9px] font-bold text-gray-400 px-3 py-1.5 rounded-full border border-gray-200 active:bg-gray-100 transition-colors"
+                className="text-[9px] font-bold text-gray-400 px-3 py-1.5 rounded-full border border-gray-200 active:bg-gray-100 transition-colors shrink-0"
               >
                 ログアウト
               </button>
             ) : (
               <button
                 onClick={handleLogin}
-                className="text-[9px] font-bold text-[#ff8da1] px-3 py-1.5 rounded-full border border-[#ffdce5] active:bg-[#fff5f7] transition-colors"
+                className="text-[9px] font-bold text-[#ff8da1] px-3 py-1.5 rounded-full border border-[#ffdce5] active:bg-[#fff5f7] transition-colors shrink-0"
               >
                 ログイン
               </button>
             )}
             <button
               onClick={openAddModal}
-              className="bg-black text-white w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-lg shadow-black/10"
+              className="bg-black text-white w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-lg shadow-black/10 shrink-0"
             >
               <Icon name="Plus" size={20} />
             </button>
@@ -358,35 +445,35 @@ const App = () => {
         ) : (
           <div className="space-y-4">
             {activeTab === 'templates' ? (
-              templates.length === 0 ? (
+              visibleTemplates.length === 0 ? (
                 <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">
-                  データがありません
+                  {isSearching ? '検索結果がありません' : 'データがありません'}
                 </p>
-              ) : (
-                templates.map((item) => (
-                  <TemplateCard
-                    key={item.id}
-                    item={item}
-                    onEdit={openEditTemplate}
-                    onDelete={deleteTemplate}
-                    onCopy={handleCopy}
-                  />
+              ) : isSearching ? (
+                visibleTemplates.map((item) => (
+                  <div key={item.id}>{renderTemplateCard(item)}</div>
                 ))
+              ) : (
+                <SortableList
+                  items={visibleTemplates}
+                  onReorder={handleReorderTemplates}
+                  renderItem={renderTemplateCard}
+                />
               )
             ) : visibleExchanges.length === 0 ? (
               <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">
-                データがありません
+                {isSearching ? '検索結果がありません' : 'データがありません'}
               </p>
-            ) : (
+            ) : isSearching ? (
               visibleExchanges.map((item) => (
-                <ExchangeCard
-                  key={item.id}
-                  item={item}
-                  onEdit={openEditExchange}
-                  onDelete={deleteExchange}
-                  onCopy={handleCopy}
-                />
+                <div key={item.id}>{renderExchangeCard(item)}</div>
               ))
+            ) : (
+              <SortableList
+                items={visibleExchanges}
+                onReorder={handleReorderExchanges}
+                renderItem={renderExchangeCard}
+              />
             )}
           </div>
         )}
