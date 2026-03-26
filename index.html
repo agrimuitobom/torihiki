@@ -35,7 +35,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+        const { useState, useEffect, useCallback, useRef } = React;
 
         // ────────────────────────────────────────────
         // SVGアイコンコンポーネント
@@ -71,6 +71,78 @@
                     <path d={icon.d} />
                 </svg>
             );
+        };
+
+        // ────────────────────────────────────────────
+        // トースト通知
+        // ────────────────────────────────────────────
+        const Toast = ({ message, visible }) => (
+            <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none ${
+                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+            }`}>
+                <div className="bg-black/80 text-white text-[11px] font-bold px-5 py-2.5 rounded-full shadow-xl whitespace-nowrap backdrop-blur-sm">
+                    {message}
+                </div>
+            </div>
+        );
+
+        const useToast = () => {
+            const [toast, setToast] = useState({ message: "", visible: false });
+            const timerRef = useRef(null);
+
+            const showToast = useCallback((message) => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                setToast({ message, visible: true });
+                timerRef.current = setTimeout(() => {
+                    setToast((prev) => ({ ...prev, visible: false }));
+                }, 1800);
+            }, []);
+
+            return { toast, showToast };
+        };
+
+        // ────────────────────────────────────────────
+        // 削除確認ダイアログ
+        // ────────────────────────────────────────────
+        const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
+                <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl space-y-4">
+                    <p className="text-xs font-bold text-center text-gray-600 leading-relaxed">{message}</p>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onCancel}
+                            className="flex-1 py-3 rounded-2xl text-[11px] font-black bg-gray-100 text-gray-400 active:bg-gray-200 transition-colors"
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            className="flex-1 py-3 rounded-2xl text-[11px] font-black bg-red-500 text-white active:bg-red-600 transition-colors"
+                        >
+                            削除する
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const useConfirm = () => {
+            const [dialog, setDialog] = useState(null);
+
+            const confirm = useCallback((message) => {
+                return new Promise((resolve) => {
+                    setDialog({ message, resolve });
+                });
+            }, []);
+
+            const handleConfirm = () => { dialog.resolve(true);  setDialog(null); };
+            const handleCancel  = () => { dialog.resolve(false); setDialog(null); };
+
+            const ConfirmUI = dialog ? (
+                <ConfirmDialog message={dialog.message} onConfirm={handleConfirm} onCancel={handleCancel} />
+            ) : null;
+
+            return { confirm, ConfirmUI };
         };
 
         // ────────────────────────────────────────────
@@ -179,7 +251,7 @@
         // ────────────────────────────────────────────
         // 取引カード
         // ────────────────────────────────────────────
-        const ExchangeCard = ({ item, onEdit, onDelete }) => (
+        const ExchangeCard = ({ item, onEdit, onDelete, onCopy }) => (
             <div className="bg-white rounded-[1.5rem] p-5 border border-gray-100 shadow-sm space-y-4">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -189,7 +261,7 @@
                         <div>
                             <h3 className="font-black text-sm text-black leading-tight tracking-tight">{item.accountName}</h3>
                             <button
-                                onClick={() => copyToClipboard(item.twitterId)}
+                                onClick={() => onCopy(item.twitterId, "IDをコピーしました")}
                                 className="text-[10px] font-bold text-[#ff8da1] flex items-center gap-1 mt-0.5"
                             >
                                 @{item.twitterId} <Icon name="Clipboard" size={10} />
@@ -253,7 +325,7 @@
         // ────────────────────────────────────────────
         // 定型文カード
         // ────────────────────────────────────────────
-        const TemplateCard = ({ item, onEdit, onDelete }) => (
+        const TemplateCard = ({ item, onEdit, onDelete, onCopy }) => (
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
                 <div className="flex justify-between items-center">
                     <h3 className="font-black text-xs flex items-center gap-1.5 italic">
@@ -262,7 +334,7 @@
                     </h3>
                     <div className="flex gap-2">
                         <button
-                            onClick={() => copyToClipboard(item.content)}
+                            onClick={() => onCopy(item.content, "定型文をコピーしました")}
                             className="p-2.5 bg-[#fff5f7] text-[#ff8da1] rounded-xl active:scale-90"
                         >
                             <Icon name="Clipboard" size={16} />
@@ -284,17 +356,20 @@
         // ────────────────────────────────────────────
         // 取引モーダルフォーム
         // ────────────────────────────────────────────
-        const ExchangeForm = ({ formData, onChange, onSave }) => (
+        const ExchangeForm = ({ formData, onChange, onSave, errors = {} }) => (
             <div className="space-y-5 pb-6">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                         <p className="text-[8px] font-black text-gray-400 ml-1 uppercase">Name</p>
                         <input
                             type="text" placeholder="名前"
-                            className="w-full bg-[#fafafa] rounded-2xl p-4 text-[14px] font-bold border-2 border-transparent focus:border-black outline-none transition-all"
+                            className={`w-full bg-[#fafafa] rounded-2xl p-4 text-[14px] font-bold border-2 outline-none transition-all ${
+                                errors.accountName ? "border-red-400 bg-red-50" : "border-transparent focus:border-black"
+                            }`}
                             value={formData.accountName}
                             onChange={(e) => onChange({ accountName: e.target.value })}
                         />
+                        {errors.accountName && <p className="text-[9px] text-red-400 font-bold ml-1">{errors.accountName}</p>}
                     </div>
                     <div className="space-y-1.5">
                         <p className="text-[8px] font-black text-gray-400 ml-1 uppercase">Twitter ID</p>
@@ -398,16 +473,19 @@
         // ────────────────────────────────────────────
         // 定型文モーダルフォーム
         // ────────────────────────────────────────────
-        const TemplateForm = ({ templateData, onChange, onSave }) => (
+        const TemplateForm = ({ templateData, onChange, onSave, errors = {} }) => (
             <div className="space-y-5 pb-6">
                 <div className="space-y-1.5">
                     <p className="text-[8px] font-black text-gray-400 ml-1 uppercase">Template Title</p>
                     <input
                         placeholder="タイトル"
-                        className="w-full bg-[#fafafa] rounded-2xl p-4 text-[14px] font-black outline-none border-2 border-transparent focus:border-black transition-all"
+                        className={`w-full bg-[#fafafa] rounded-2xl p-4 text-[14px] font-black outline-none border-2 transition-all ${
+                            errors.title ? "border-red-400 bg-red-50" : "border-transparent focus:border-black"
+                        }`}
                         value={templateData.title}
                         onChange={(e) => onChange({ title: e.target.value })}
                     />
+                    {errors.title && <p className="text-[9px] text-red-400 font-bold ml-1">{errors.title}</p>}
                 </div>
                 <div className="space-y-1.5">
                     <p className="text-[8px] font-black text-gray-400 ml-1 uppercase">Body Content</p>
@@ -430,9 +508,23 @@
         // ────────────────────────────────────────────
         // モーダル
         // ────────────────────────────────────────────
-        const Modal = ({ modalType, formData, onFormChange, templateData, onTemplateChange, onSave, onClose }) => (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col justify-end transition-all">
-                <div className="bg-white w-full rounded-t-[2.5rem] p-8 pb-12 shadow-2xl overflow-y-auto max-h-[90vh] modal-up">
+        const Modal = ({ modalType, formData, onFormChange, templateData, onTemplateChange, onSave, onClose, errors }) => {
+            // Escキーで閉じる
+            useEffect(() => {
+                const handler = (e) => { if (e.key === "Escape") onClose(); };
+                document.addEventListener("keydown", handler);
+                return () => document.removeEventListener("keydown", handler);
+            }, [onClose]);
+
+            return (
+            <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col justify-end transition-all"
+                onMouseDown={onClose}
+            >
+                <div
+                    className="bg-white w-full rounded-t-[2.5rem] p-8 pb-12 shadow-2xl overflow-y-auto max-h-[90vh] modal-up"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
                     <header className="flex justify-between items-center mb-8 sticky top-0 bg-white z-10">
                         <div className="w-12 h-1.5 bg-gray-100 rounded-full absolute -top-4 left-1/2 -translate-x-1/2" />
                         <h2 className="text-sm font-black italic tracking-widest border-l-4 border-[#ffb8c6] pl-3 uppercase">
@@ -447,13 +539,14 @@
                     </header>
 
                     {modalType === "exchange" ? (
-                        <ExchangeForm formData={formData} onChange={onFormChange} onSave={onSave} />
+                        <ExchangeForm formData={formData} onChange={onFormChange} onSave={onSave} errors={errors} />
                     ) : (
-                        <TemplateForm templateData={templateData} onChange={onTemplateChange} onSave={onSave} />
+                        <TemplateForm templateData={templateData} onChange={onTemplateChange} onSave={onSave} errors={errors} />
                     )}
                 </div>
             </div>
-        );
+            );
+        };
 
         // ────────────────────────────────────────────
         // メインアプリ
@@ -467,6 +560,16 @@
             const [editingItem, setEditingItem] = useState(null);
             const [formData, setFormData] = useState({ ...EMPTY_EXCHANGE });
             const [templateData, setTemplateData] = useState({ ...EMPTY_TEMPLATE });
+            const [errors, setErrors] = useState({});
+
+            const { toast, showToast } = useToast();
+            const { confirm, ConfirmUI } = useConfirm();
+
+            // モーダル表示中はbodyスクロールを無効化
+            useEffect(() => {
+                document.body.style.overflow = showModal ? "hidden" : "";
+                return () => { document.body.style.overflow = ""; };
+            }, [showModal]);
 
             const stats = {
                 ongoing:   exchanges.filter((e) => e.category === "ongoing").length,
@@ -477,6 +580,7 @@
 
             const openAddModal = useCallback(() => {
                 setEditingItem(null);
+                setErrors({});
                 const type = activeTab === "templates" ? "template" : "exchange";
                 setModalType(type);
                 setFormData({ ...EMPTY_EXCHANGE, category: activeTab === "templates" ? "ongoing" : activeTab });
@@ -486,6 +590,7 @@
 
             const openEditExchange = useCallback((item) => {
                 setEditingItem(item);
+                setErrors({});
                 setFormData({ ...item });
                 setModalType("exchange");
                 setShowModal(true);
@@ -493,6 +598,7 @@
 
             const openEditTemplate = useCallback((item) => {
                 setEditingItem(item);
+                setErrors({});
                 setTemplateData({ ...item });
                 setModalType("template");
                 setShowModal(true);
@@ -501,40 +607,75 @@
             const closeModal = useCallback(() => {
                 setShowModal(false);
                 setEditingItem(null);
+                setErrors({});
             }, []);
 
+            const validate = useCallback(() => {
+                const errs = {};
+                if (modalType === "exchange") {
+                    if (!formData.accountName.trim()) errs.accountName = "名前を入力してください";
+                } else {
+                    if (!templateData.title.trim()) errs.title = "タイトルを入力してください";
+                }
+                setErrors(errs);
+                return Object.keys(errs).length === 0;
+            }, [modalType, formData, templateData]);
+
             const handleSave = useCallback(() => {
+                if (!validate()) return;
                 if (modalType === "exchange") {
                     if (editingItem) {
                         setExchanges((prev) => prev.map((e) => e.id === editingItem.id ? { ...formData, id: e.id } : e));
                     } else {
                         setExchanges((prev) => [...prev, { ...formData, id: Date.now() }]);
                     }
+                    showToast("取引データを保存しました");
                 } else {
                     if (editingItem) {
                         setTemplates((prev) => prev.map((t) => t.id === editingItem.id ? { ...templateData, id: t.id } : t));
                     } else {
                         setTemplates((prev) => [...prev, { ...templateData, id: Date.now() }]);
                     }
+                    showToast("定型文を保存しました");
                 }
                 closeModal();
-            }, [modalType, editingItem, formData, templateData, closeModal]);
+            }, [modalType, editingItem, formData, templateData, validate, closeModal, showToast]);
 
-            const deleteExchange = useCallback((id) => {
+            const deleteExchange = useCallback(async (id) => {
+                const ok = await confirm("この取引データを削除しますか？\nこの操作は元に戻せません。");
+                if (!ok) return;
                 setExchanges((prev) => prev.filter((e) => e.id !== id));
-            }, []);
+                showToast("削除しました");
+            }, [confirm, showToast]);
 
-            const deleteTemplate = useCallback((id) => {
+            const deleteTemplate = useCallback(async (id) => {
+                const ok = await confirm("この定型文を削除しますか？\nこの操作は元に戻せません。");
+                if (!ok) return;
                 setTemplates((prev) => prev.filter((t) => t.id !== id));
-            }, []);
+                showToast("削除しました");
+            }, [confirm, showToast]);
 
             const handleFormChange = useCallback((patch) => {
                 setFormData((prev) => ({ ...prev, ...patch }));
-            }, []);
+                // 入力時にエラーをクリア
+                const keys = Object.keys(patch);
+                if (keys.some((k) => errors[k])) {
+                    setErrors((prev) => { const next = { ...prev }; keys.forEach((k) => delete next[k]); return next; });
+                }
+            }, [errors]);
 
             const handleTemplateChange = useCallback((patch) => {
                 setTemplateData((prev) => ({ ...prev, ...patch }));
-            }, []);
+                const keys = Object.keys(patch);
+                if (keys.some((k) => errors[k])) {
+                    setErrors((prev) => { const next = { ...prev }; keys.forEach((k) => delete next[k]); return next; });
+                }
+            }, [errors]);
+
+            const handleCopy = useCallback(async (text, label = "コピーしました") => {
+                await copyToClipboard(text);
+                showToast(label);
+            }, [showToast]);
 
             const visibleExchanges = exchanges.filter((e) => e.category === activeTab);
 
@@ -567,7 +708,7 @@
                                     <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">データがありません</p>
                                 ) : (
                                     templates.map((item) => (
-                                        <TemplateCard key={item.id} item={item} onEdit={openEditTemplate} onDelete={deleteTemplate} />
+                                        <TemplateCard key={item.id} item={item} onEdit={openEditTemplate} onDelete={deleteTemplate} onCopy={handleCopy} />
                                     ))
                                 )
                             ) : (
@@ -575,7 +716,7 @@
                                     <p className="text-center py-10 text-gray-300 text-[10px] font-bold italic">データがありません</p>
                                 ) : (
                                     visibleExchanges.map((item) => (
-                                        <ExchangeCard key={item.id} item={item} onEdit={openEditExchange} onDelete={deleteExchange} />
+                                        <ExchangeCard key={item.id} item={item} onEdit={openEditExchange} onDelete={deleteExchange} onCopy={handleCopy} />
                                     ))
                                 )
                             )}
@@ -592,8 +733,15 @@
                             onTemplateChange={handleTemplateChange}
                             onSave={handleSave}
                             onClose={closeModal}
+                            errors={errors}
                         />
                     )}
+
+                    {/* 削除確認ダイアログ */}
+                    {ConfirmUI}
+
+                    {/* トースト通知 */}
+                    <Toast message={toast.message} visible={toast.visible} />
                 </div>
             );
         };
