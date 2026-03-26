@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
@@ -29,7 +29,7 @@ export const useAuth = (): UseAuthReturn => {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    await signInWithPopup(auth, googleProvider);
+    await signInWithRedirect(auth, googleProvider);
   }, []);
 
   const signOut = useCallback(async () => {
